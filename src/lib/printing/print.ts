@@ -30,12 +30,16 @@ export async function printFormularios(
     const item = cola[i];
     onProgress?.({ actual: i + 1, total, formularioNombre: item.nombre });
 
-    await imprimirUno(item.storagePath, item.nombre);
+    try {
+      await imprimirUno(item.storagePath, item.nombre);
+    } catch (err) {
+      console.warn('Error al imprimir un formulario, continuando con el siguiente:', err);
+    }
   }
 }
 
 function imprimirUno(storagePath: string, formularioNombre: string): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const previousTitle = document.title;
     const printTitle = formularioNombre.replace(/\.pdf$/i, '');
     document.title = printTitle;
@@ -53,7 +57,7 @@ function imprimirUno(storagePath: string, formularioNombre: string): Promise<voi
     let resolved = false;
     let removePrintListeners = () => {};
 
-    const cleanup = (error?: Error) => {
+    const cleanup = () => {
       if (resolved) return;
       resolved = true;
       removePrintListeners();
@@ -63,16 +67,22 @@ function imprimirUno(storagePath: string, formularioNombre: string): Promise<voi
         // Ignorar
       }
       document.title = previousTitle;
-      if (error) reject(error);
-      else resolve();
+      resolve();
     };
 
     const loadTimer = setTimeout(() => {
       if (!resolved) {
         console.warn(`PDF tardó más de ${PDF_LOAD_TIMEOUT}ms: ${storagePath}`);
-        cleanup(new Error(`El PDF tardó demasiado en cargar: ${formularioNombre}`));
+        cleanup();
       }
     }, PDF_LOAD_TIMEOUT);
+
+    const fallbackPrintTimer = setTimeout(() => {
+      if (!resolved) {
+        console.warn(`No se recibió afterprint para: ${formularioNombre}. Continuando con el siguiente.`);
+        cleanup();
+      }
+    }, 25000);
 
     iframe.onload = () => {
       clearTimeout(loadTimer);
@@ -80,11 +90,13 @@ function imprimirUno(storagePath: string, formularioNombre: string): Promise<voi
         try {
           const win = iframe.contentWindow;
           if (!win) {
-            cleanup(new Error(`No se pudo abrir el PDF: ${formularioNombre}`));
+            clearTimeout(fallbackPrintTimer);
+            cleanup();
             return;
           }
 
           const finishAfterPrint = () => {
+            clearTimeout(fallbackPrintTimer);
             cleanup();
           };
 
@@ -97,15 +109,17 @@ function imprimirUno(storagePath: string, formularioNombre: string): Promise<voi
           win.focus();
           win.print();
         } catch (err) {
+          clearTimeout(fallbackPrintTimer);
           console.error('Error en print:', err);
-          cleanup(err instanceof Error ? err : new Error(`Error al imprimir ${formularioNombre}`));
+          cleanup();
         }
       }, 50);
     };
 
     iframe.onerror = () => {
       clearTimeout(loadTimer);
-      cleanup(new Error(`Error cargando PDF: ${formularioNombre}`));
+      clearTimeout(fallbackPrintTimer);
+      cleanup();
     };
 
     document.body.appendChild(iframe);

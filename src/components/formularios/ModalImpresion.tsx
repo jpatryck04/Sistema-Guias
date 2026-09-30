@@ -71,9 +71,10 @@ export function ModalImpresion({
               Imprimiendo {progreso.actual} de {progreso.total}...
             </p>
             <Progress value={(progreso.actual / progreso.total) * 100} />
-            <p className="text-xs text-muted-foreground">{progreso.formularioNombre}</p>
+            <p className="text-sm font-semibold text-foreground">{progreso.formularioNombre}</p>
             <p className="text-xs text-muted-foreground">
-              Confirma o cierra el diálogo del navegador para continuar con el siguiente.
+              Esperando confirmación del navegador. Cuando cierres el diálogo de impresión, se
+              continuará con el siguiente formulario.
             </p>
           </div>
         ) : (
