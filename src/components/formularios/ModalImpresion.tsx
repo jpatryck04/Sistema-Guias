@@ -81,9 +81,11 @@ export function ModalImpresion({
           <>
             <div className="max-h-[50vh] space-y-3 overflow-y-auto py-2">
               {formularios.map((f) => (
-                <div key={f.id} className="flex items-center gap-3">
-                  <div className="flex-1 truncate text-sm">{f.nombre}</div>
-                  <div className="flex items-center gap-2">
+                <div key={f.id} className="flex flex-col gap-2 border-b pb-3 sm:flex-row sm:items-center sm:gap-3">
+                  <div className="min-w-0 flex-1 whitespace-normal break-words text-sm leading-5">
+                    {f.nombre}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2 sm:justify-end">
                     <Label className="text-xs">Copias</Label>
                     <Input
                       type="number"
