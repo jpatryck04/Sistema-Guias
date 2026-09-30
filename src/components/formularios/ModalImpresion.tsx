@@ -51,14 +51,15 @@ export function ModalImpresion({
       storagePath: f.storage_path,
       copias: copias[f.id] ?? 1,
     }));
-    const ok = await onConfirm(items);
-    if (ok) onOpenChange(false);
+
+    onOpenChange(false);
+    await onConfirm(items);
   }
 
   const totalCopias = Object.values(copias).reduce((a, b) => a + b, 0);
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !imprimiendo && onOpenChange(v)}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Confirmar impresión</DialogTitle>

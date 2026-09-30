@@ -1,0 +1,113 @@
+[1mdiff --git a/src/lib/printing/print.ts b/src/lib/printing/print.ts[m
+[1mindex ff9904c..3fb1e13 100644[m
+[1m--- a/src/lib/printing/print.ts[m
+[1m+++ b/src/lib/printing/print.ts[m
+[36m@@ -1,7 +1,6 @@[m
+ import type { ItemImpresion, ProgresoImpresion } from '@/types/impresion';[m
+ [m
+ const PDF_LOAD_TIMEOUT = 8000;[m
+[31m-const PRINT_DIALOG_TIMEOUT = 15000;[m
+ [m
+ /**[m
+  * Imprime una lista de formularios de forma secuencial.[m
+[36m@@ -31,18 +30,11 @@[m [mexport async function printFormularios([m
+     const item = cola[i];[m
+     onProgress?.({ actual: i + 1, total, formularioNombre: item.nombre });[m
+ [m
+[31m-    try {[m
+[31m-      await imprimirUno(item.storagePath, item.nombre, PRINT_DIALOG_TIMEOUT);[m
+[31m-    } catch (err) {[m
+[31m-      console.error(`Error imprimiendo ${item.nombre}:`, err);[m
+[31m-    }[m
+[31m-[m
+[31m-    // Reducimos el tiempo de transición para acelerar la cola de impresión.[m
+[31m-    await sleep(40);[m
+[32m+[m[32m    await imprimirUno(item.storagePath, item.nombre);[m
+   }[m
+ }[m
+ [m
+[31m-function imprimirUno(storagePath: string, formularioNombre: string, printTimeoutMs: number): Promise<void> {[m
+[32m+[m[32mfunction imprimirUno(storagePath: string, formularioNombre: string): Promise<void> {[m
+   return new Promise((resolve, reject) => {[m
+     const previousTitle = document.title;[m
+     const printTitle = formularioNombre.replace(/\.pdf$/i, '');[m
+[36m@@ -59,13 +51,11 @@[m [mfunction imprimirUno(storagePath: string, formularioNombre: string, printTimeout[m
+     iframe.title = formularioNombre;[m
+ [m
+     let resolved = false;[m
+[31m-    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;[m
+     let removePrintListeners = () => {};[m
+ [m
+[31m-    const cleanup = () => {[m
+[32m+[m[32m    const cleanup = (error?: Error) => {[m
+       if (resolved) return;[m
+       resolved = true;[m
+[31m-      clearTimeout(fallbackTimer);[m
+       removePrintListeners();[m
+       try {[m
+         document.body.removeChild(iframe);[m
+[36m@@ -73,13 +63,14 @@[m [mfunction imprimirUno(storagePath: string, formularioNombre: string, printTimeout[m
+         // Ignorar[m
+       }[m
+       document.title = previousTitle;[m
+[31m-      resolve();[m
+[32m+[m[32m      if (error) reject(error);[m
+[32m+[m[32m      else resolve();[m
+     };[m
+ [m
+     const loadTimer = setTimeout(() => {[m
+       if (!resolved) {[m
+         console.warn(`PDF tardó más de ${PDF_LOAD_TIMEOUT}ms: ${storagePath}`);[m
+[31m-        cleanup();[m
+[32m+[m[32m        cleanup(new Error(`El PDF tardó demasiado en cargar: ${formularioNombre}`));[m
+       }[m
+     }, PDF_LOAD_TIMEOUT);[m
+ [m
+[36m@@ -89,7 +80,7 @@[m [mfunction imprimirUno(storagePath: string, formularioNombre: string, printTimeout[m
+         try {[m
+           const win = iframe.contentWindow;[m
+           if (!win) {[m
+[31m-            cleanup();[m
+[32m+[m[32m            cleanup(new Error(`No se pudo abrir el PDF: ${formularioNombre}`));[m
+             return;[m
+           }[m
+ [m
+[36m@@ -98,35 +89,25 @@[m [mfunction imprimirUno(storagePath: string, formularioNombre: string, printTimeout[m
+           };[m
+ [m
+           win.addEventListener('afterprint', finishAfterPrint);[m
+[31m-          window.addEventListener('afterprint', finishAfterPrint);[m
+ [m
+           removePrintListeners = () => {[m
+             win.removeEventListener('afterprint', finishAfterPrint);[m
+[31m-            window.removeEventListener('afterprint', finishAfterPrint);[m
+           };[m
+ [m
+           win.focus();[m
+           win.print();[m
+[31m-[m
+[31m-          // Fallback si afterprint no dispara.[m
+[31m-          fallbackTimer = setTimeout(cleanup, printTimeoutMs);[m
+         } catch (err) {[m
+           console.error('Error en print:', err);[m
+[31m-          cleanup();[m
+[32m+[m[32m          cleanup(err instanceof Error ? err : new Error(`Error al imprimir ${formularioNombre}`));[m
+         }[m
+       }, 50);[m
+     };[m
+ [m
+     iframe.onerror = () => {[m
+       clearTimeout(loadTimer);[m
+[31m-      document.title = previousTitle;[m
+[31m-      reject(new Error(`Error cargando PDF: ${storagePath}`));[m
+[32m+[m[32m      cleanup(new Error(`Error cargando PDF: ${formularioNombre}`));[m
+     };[m
+ [m
+     document.body.appendChild(iframe);[m
+   });[m
+[31m-}[m
+[31m-[m
+[31m-function sleep(ms: number): Promise<void> {[m
+[31m-  return new Promise((r) => setTimeout(r, ms));[m
+ }[m
+\ No newline at end of file[m
